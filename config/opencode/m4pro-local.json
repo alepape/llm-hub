@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "m4pro-local/qwen35-35b",
+  "providers": {
+    "m4pro-local": {
+      "name": "M4 Pro (localhost, no router)",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://127.0.0.1:8080/v1",
+        "apiKey": "sk-local",
+        "headerTimeout": 900000
+      },
+      "compatibility": { "maxTokensField": "max_tokens" },
+      "models": {
+        "qwen35-35b": {
+          "name": "Qwen3.5 35B (M4 Pro, offline/local)",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] },
+          "limit": { "context": 65536, "output": 8192 }
+        }
+      }
+    }
+  }
+}

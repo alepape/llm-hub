@@ -291,6 +291,49 @@ tell them apart.
 
 ## Client configuration
 
+### M4 Pro away from home (direct local OpenCode)
+
+On the laptop after pulling this repo, run once (Python 3 required):
+
+```bash
+git pull
+python3 scripts/setup-opencode-local.py
+```
+
+This configures OpenCode **V2** globally with provider `m4pro-local`, model
+`qwen35-35b`, and endpoint `http://127.0.0.1:8080/v1`. No router, SSH, home
+network, or LiteLLM key is involved. `sk-local` is a placeholder for the
+default unauthenticated llama-swap configuration, not a secret. If you add
+`apiKeys` to llama-swap, update this provider's key locally too.
+
+The installer preserves other providers and MCPs, backs up changed configs,
+and updates an existing `~/.opencode` default override as well. JSONC comments
+are preserved in the backups; edited files are formatted as JSON. It respects
+`XDG_CONFIG_HOME` and is safe to run again. Project-specific model defaults
+can still override the global one.
+
+Start the model host **using the existing script unchanged**, or leave its
+existing launchd service running (do not start a duplicate):
+
+```bash
+./scripts/start-models.sh m4pro
+```
+
+In another terminal, open OpenCode. New sessions default to the local model;
+for existing sessions, use `/reload` if needed and select
+**Qwen3.5 35B (M4 Pro, offline/local)** in `/models`. First inference cold-loads
+the model, and idle unloading still works. Download the model once while
+online before relying on it away from home. Existing remote MCPs and cloud
+providers still require their respective networks; this makes **inference**
+local, not every tool.
+
+To return to home routing, select `llm-hub/auto` in `/models` (if configured).
+To restore it as the default, change `model` back in the affected config files
+or restore the timestamped backups. The installer does not touch model-host
+configuration or services.
+
+### Router clients
+
 Point anything OpenAI-compatible at the router:
 
 ```bash
