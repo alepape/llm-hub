@@ -1,0 +1,86 @@
+# LiteLLM proxy — single OpenAI-compatible entry point.
+#
+# Deployments are grouped by model_name:
+#   big   -> the 35B on the laptop (fails loudly if the laptop is away)
+#   small -> the 8B on the mini (always on)
+#   auto  -> big first, small as fallback (order 1 -> 2)
+#
+# api_base values come from config/router/router.env so a renamed laptop is a
+# one-line change. Hostnames must be mDNS names (.local), not IPs: when the
+# laptop is off the name fails to resolve and failover is instant instead of
+# waiting for a TCP timeout.
+
+model_list:
+  # ---------------------------------------------------------------- big (35B)
+  - model_name: big
+    litellm_params:
+      model: openai/qwen35-35b
+      api_base: os.environ/M4PRO_BASE
+      api_key: os.environ/LOCAL_KEY
+      timeout: 900          # cold load of a 20 GB model
+      stream_timeout: 900
+    model_info:
+      max_input_tokens: 65536
+      supports_function_calling: true
+      mode: chat
+
+  # -------------------------------------------------------------- small (8B)
+  - model_name: small
+    litellm_params:
+      model: openai/qwen3-8b
+      api_base: os.environ/M2PRO_BASE
+      api_key: os.environ/LOCAL_KEY
+      timeout: 600
+      stream_timeout: 600
+    model_info:
+      max_input_tokens: 32768
+      supports_function_calling: true
+      mode: chat
+
+  # ------------------------------------------------------- auto (big -> small)
+  - model_name: auto
+    litellm_params:
+      model: openai/qwen35-35b
+      api_base: os.environ/M4PRO_BASE
+      api_key: os.environ/LOCAL_KEY
+      timeout: 900
+      stream_timeout: 900
+      order: 1
+    model_info:
+      max_input_tokens: 65536
+      supports_function_calling: true
+      mode: chat
+
+  - model_name: auto
+    litellm_params:
+      model: openai/qwen3-8b
+      api_base: os.environ/M2PRO_BASE
+      api_key: os.environ/LOCAL_KEY
+      timeout: 600
+      stream_timeout: 600
+      order: 2
+    model_info:
+      max_input_tokens: 32768
+      supports_function_calling: true
+      mode: chat
+
+router_settings:
+  # No retry against a dead host; `order` already escalates to the next.
+  num_retries: 0
+  # Cool a failing deployment down so an absent laptop is tried at most once a
+  # minute, then re-admitted automatically when it comes back.
+  allowed_fails: 1
+  cooldown_time: 60
+  # Filter out deployments whose context window is too small for the prompt.
+  # Token counting for custom endpoints is approximate (generic tokenizer).
+  enable_pre_call_checks: true
+
+litellm_settings:
+  # llama-server rejects unknown sampling params on some builds.
+  drop_params: true
+
+general_settings:
+  # Required: LiteLLM (>= ~1.10x) refuses to start without a master key, since
+  # an unauthenticated proxy accepts every request. Clients send this key.
+  master_key: os.environ/LITELLM_MASTER_KEY
+

@@ -1,0 +1,6 @@
+.venv/
+config/router/router.env
+logs/
+*.log
+.DS_Store
+__pycache__/

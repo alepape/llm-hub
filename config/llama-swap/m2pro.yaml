@@ -1,0 +1,44 @@
+# llama-swap — mini-thunder (M2 Pro, 16 GB)
+#
+# Loads on first request, unloads after ttl. Nothing is resident while idle.
+# Start with: ./scripts/start-models.sh m2pro
+#
+# Budget: ~10-12 GB usable GPU memory.
+#   Qwen3-8B Q4_K_M  ~5 GB weights
+#   32k ctx, q8_0 KV ~2.5 GB
+#   compute buffers  ~1 GB
+#
+# If the machine (16 GB total, also your daily driver) starts swapping, drop
+# -c to 16384 in the cmd below and lower the context capability to match.
+
+healthCheckTimeout: 600    # generous: first request may also download the model
+logLevel: info
+logToStdout: "proxy,http"
+startPort: 10001
+unloadTimeout: 15
+globalTTL: 600             # unload 10 min after the last request
+includeAliasesInList: true
+
+macros:
+  llama: ${env.LLAMA_SERVER_BIN}
+
+models:
+  qwen3-8b:
+    name: "Qwen3 8B (mini-thunder)"
+    description: "Always-on fallback. 32k context. Tool calling."
+    cmd: |
+      ${llama}
+      -hf unsloth/Qwen3-8B-GGUF:Q4_K_M
+      --jinja --no-mmproj
+      -ngl 99
+      -c 32768
+      -fa on -ctk q8_0 -ctv q8_0
+      --host 127.0.0.1 --port ${PORT}
+    ttl: 600
+    aliases:
+      - small
+    capabilities:
+      context: 32768
+      tools: true
+      in: [text]
+      out: [text]
