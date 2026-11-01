@@ -8,7 +8,7 @@ set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 case "${1:-}" in
-  m4pro) URL="${M4PRO_HOST:-http://m4pro.local:8080}" ;;
+  m4pro) URL="${M4PRO_HOST:-http://FM7XXRXT4V.local:8080}" ;;
   m2pro) URL="${M2PRO_HOST:-http://mini-thunder:8080}" ;;
   *) echo "usage: $0 <m2pro|m4pro>" >&2; exit 2 ;;
 esac

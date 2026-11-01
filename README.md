@@ -48,7 +48,7 @@ it isn't. Nothing is loaded while idle. No machine has to be dedicated.
 |---|---|---|
 | `imac-thunder` | router only (LiteLLM :4000) | `imac-thunder` → 192.168.2.2 (TB), 192.168.1.37 (LAN) |
 | `mini-thunder` (m2pro, 16 GB) | model host :8080 | `mini-thunder` → 192.168.2.1 (TB), 192.168.1.26 (LAN) |
-| `m4pro` (laptop, 48 GB) | model host :8080 | Wi-Fi only; mDNS name TBD (`m4pro.local` assumed) |
+| `m4pro` (laptop, 48 GB) | model host :8080 | Wi-Fi; Bonjour name `FM7XXRXT4V.local` |
 
 ### Networking notes
 
@@ -63,11 +63,17 @@ it isn't. Nothing is loaded while idle. No machine has to be dedicated.
   config, provided its hostname still resolves. If you want it on the TB subnet
   specifically, add a second mDNS/static name and change one line in
   `config/router/router.env`.
-- One Wi-Fi caveat: **a sleeping laptop must fail fast, not hang.** A stale
-  DHCP lease that still answers ARP will burn the full request timeout. That is
-  why the config uses `.local` names — when the machine is off, DNS fails
-  immediately and LiteLLM fails over in milliseconds. If you ever see requests
-  hanging for minutes instead of failing over, this is the cause.
+- `.local` is reserved for Bonjour/mDNS, not ordinary local DNS records. The
+  laptop advertises `FM7XXRXT4V.local`; a separate DNS alias `m4pro.local` is
+  retained for other uses, but is not used by the router.
+- **mDNS does not guarantee fast failure.** Tests with laptop Wi-Fi off still
+  returned cached IPv4/IPv6 addresses immediately, followed by TCP timeouts.
+  `config/router/connect_timeout.py` sets a separate 3-second HTTP connection
+  budget while preserving the 600/900-second response budgets for cold starts.
+  This bounds connection establishment, not total failover time: DNS/address
+  handling, router overhead and the fallback model's own load/generation can
+  add time. An already-connected but stalled backend still uses the long read
+  timeout; a stream already in progress cannot migrate seamlessly.
 
 ## Files
 
@@ -116,7 +122,7 @@ that file wherever a client asks for an API key.
 `config/router/router.env`:
 
 ```bash
-M4PRO_BASE=http://m4pro.local:8080/v1
+M4PRO_BASE=http://FM7XXRXT4V.local:8080/v1
 M2PRO_BASE=http://mini-thunder:8080/v1
 LOCAL_KEY=sk-local
 ```
@@ -244,7 +250,7 @@ export LLAMA_SERVER_BIN="$(command -v llama-server)"
 **The hosts do not need matching llama.cpp versions.** There is no RPC, so each
 host is independent. Only LiteLLM's routing ties them together.
 
-**Set the laptop's real name.** If it is not `m4pro.local`, either fix
+**Set the laptop's real name.** If it is not `FM7XXRXT4V.local`, either fix
 `M4PRO_BASE` in `config/router/router.env` on the iMac, or add a local name:
 
 ```bash
@@ -335,7 +341,7 @@ tail -f ~/Library/Logs/llm-hub-llama-swap.log
 | Symptom | Cause | Fix |
 |---|---|---|
 | First request takes 30–60 s | model was unloaded (`ttl`) and is cold-loading | expected; raise `ttl` in the host config to keep it warm longer |
-| Requests hang for minutes, then fail | laptop asleep but its name still resolves | use the `.local` name; check `./scripts/status.sh` before suspecting the router |
+| Requests hang for minutes, then fail | old router config, or a connected backend stalled while loading | pull and restart the router to activate its connect-timeout callback; check backend logs for read stalls |
 | `auto` always answers with the 8B | laptop unreachable, or still in cooldown | `./scripts/status.sh`; cooldown is 60 s for re-admission |
 | Router returns 400 "context too long" | prompt exceeds the host's context | use `big` (64k); pre-call checks filter deployments whose `max_input_tokens` is too small |
 | `llama-swap` starts, model fails | `LLAMA_SERVER_BIN` wrong | `echo $LLAMA_SERVER_BIN; $LLAMA_SERVER_BIN --version` |
@@ -379,7 +385,39 @@ Not verified (needs the real hosts):
   with these specific GGUFs.
 - launchd autostart (`scripts/install-launchd.sh`) — plists are syntax-checked
   with `plutil -lint` but have not been bootstrapped.
-- The m4pro is assumed to be `m4pro.local`; that name has to be confirmed.
+- Real laptop-off failover timing must be measured after deploying the timeout hook.
+
+### Fast-fail connection policy
+
+The router loads `connect_timeout.timeout_policy` as a deployment callback.
+`start-router.sh` sets its module search path automatically, also under launchd.
+Keep the numeric `timeout` / `stream_timeout` values in YAML: the callback
+constructs an `httpx.Timeout` only after deployment selection. This separates
+the connection deadline from the long model-loading/read budget. Override
+`HUB_CONNECT_TIMEOUT=3` in `config/router/router.env` if needed.
+
+After pulling on the iMac, restart the foreground router (Ctrl-C, then
+`./scripts/start-router.sh`), or its launchd agent if installed:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.alepape.llmhub.router"
+```
+
+Then test `./scripts/smoke.sh auto` with the laptop online, turn its Wi-Fi off,
+and repeat. Confirm the new POST appears in the mini's logs. A cold mini can
+still take time to load: the goal is to remove the long wait for an absent
+laptop, not to eliminate cold starts. Re-enable Wi-Fi and allow the router's
+cooldown to expire before checking that it prefers the laptop again.
+
+Tests (no models or real upstream requests):
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+These test real LiteLLM routing and its HTTP transport against local stub
+servers, simulating a dropped connection and delayed response headers for
+both streaming and non-streaming calls. Verified on LiteLLM 1.106.6.
 
 ## Not done / possible next steps
 

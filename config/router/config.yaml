@@ -6,9 +6,8 @@
 #   auto  -> big first, small as fallback (order 1 -> 2)
 #
 # api_base values come from config/router/router.env so a renamed laptop is a
-# one-line change. Hostnames must be mDNS names (.local), not IPs: when the
-# laptop is off the name fails to resolve and failover is instant instead of
-# waiting for a TCP timeout.
+# one-line change. Names can remain cached when the laptop is absent; the
+# deployment callback below limits HTTP connection establishment to 3 seconds.
 
 model_list:
   # ---------------------------------------------------------------- big (35B)
@@ -76,6 +75,8 @@ router_settings:
   enable_pre_call_checks: true
 
 litellm_settings:
+  callbacks:
+    - connect_timeout.timeout_policy
   # llama-server rejects unknown sampling params on some builds.
   drop_params: true
 
@@ -83,4 +84,3 @@ general_settings:
   # Required: LiteLLM (>= ~1.10x) refuses to start without a master key, since
   # an unauthenticated proxy accepts every request. Clients send this key.
   master_key: os.environ/LITELLM_MASTER_KEY
-

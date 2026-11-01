@@ -20,7 +20,7 @@ fi
 KEY="${ROUTER_KEY:-${LITELLM_MASTER_KEY:-}}"
 
 ROUTER="${ROUTER:-http://imac-thunder:4000}"
-M4PRO_HOST="${M4PRO_HOST:-http://m4pro.local:8080}"
+M4PRO_HOST="${M4PRO_HOST:-http://FM7XXRXT4V.local:8080}"
 M2PRO_HOST="${M2PRO_HOST:-http://mini-thunder:8080}"
 
 code() { curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$1" 2>/dev/null || true; }

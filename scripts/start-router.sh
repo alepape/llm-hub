@@ -24,10 +24,13 @@ else
   echo "warning: $ENV_FILE not found, using defaults" >&2
 fi
 
-: "${M4PRO_BASE:=http://m4pro.local:8080/v1}"
+: "${M4PRO_BASE:=http://FM7XXRXT4V.local:8080/v1}"
 : "${M2PRO_BASE:=http://mini-thunder:8080/v1}"
 : "${LOCAL_KEY:=sk-local}"
 export M4PRO_BASE M2PRO_BASE LOCAL_KEY
+
+# Make the callback importable regardless of cwd (including launchd).
+export PYTHONPATH="$REPO_ROOT/config/router${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ -z "${LITELLM_MASTER_KEY:-}" ]; then
   echo "error: LITELLM_MASTER_KEY is not set." >&2
@@ -40,6 +43,7 @@ echo "big   -> $M4PRO_BASE"
 echo "small -> $M2PRO_BASE"
 echo "listen: 0.0.0.0:${ROUTER_PORT:-4000}"
 echo "client key: ${LITELLM_MASTER_KEY:0:8}..."
+echo "connect timeout: ${HUB_CONNECT_TIMEOUT:-3}s (read budgets unchanged)"
 echo
 
 exec "$REPO_ROOT/.venv/bin/litellm" \
