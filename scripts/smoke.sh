@@ -33,13 +33,25 @@ echo
 
 start=$(date +%s)
 
+payload="$(python3 -c '
+import json, sys
+print(json.dumps({
+    "model": sys.argv[1],
+    "messages": [{"role": "user", "content": sys.argv[2]}],
+    "max_tokens": 256,
+    "stream": False,
+    "chat_template_kwargs": {"enable_thinking": False},
+}))
+' "$MODEL" "$PROMPT")"
+
 resp="$(curl -sS --max-time 900 -X POST "$ROUTER/v1/chat/completions" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $KEY" \
-  -d "$(printf '{"model":"%s","messages":[{"role":"user","content":"%s"}],"max_tokens":32,"stream":false}' "$MODEL" "$PROMPT")")"
+  -d "$payload")"
 
 end=$(date +%s)
 
+echo "elapsed: $((end - start))s  (cold starts include downloading/loading)"
 echo "$resp" | python3 -c '
 import json, sys
 raw = sys.stdin.read()
@@ -50,10 +62,21 @@ except Exception:
 if "error" in d:
     print("ERROR:", json.dumps(d["error"], indent=2)); raise SystemExit(1)
 try:
-    print("reply:", d["choices"][0]["message"]["content"].strip())
-except Exception:
-    print(json.dumps(d, indent=2)[:2000])
+    choice = d["choices"][0]
+    msg = choice["message"]
+except (KeyError, IndexError, TypeError):
+    print("Unexpected response:", json.dumps(d, indent=2)[:2000])
+    raise SystemExit(1)
+print("model:", d.get("model", "(not reported)"))
+print("finish_reason:", choice.get("finish_reason"))
+print("usage:", json.dumps(d.get("usage", {})))
+extra = msg.get("provider_specific_fields") or {}
+reasoning = msg.get("reasoning_content") or msg.get("reasoning") or extra.get("reasoning_content")
+if reasoning:
+    print("reasoning:", str(reasoning)[:2000])
+content = msg.get("content")
+if not isinstance(content, str) or not content.strip():
+    print("FAIL: no visible reply (possibly reasoning exhausted the token budget).")
+    raise SystemExit(1)
+print("reply:", content.strip())
 '
-
-echo
-echo "elapsed: $((end - start))s  (a cold start is expected to be slow)"
