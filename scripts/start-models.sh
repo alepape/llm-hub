@@ -7,6 +7,9 @@
 # Env:
 #   LISTEN            default 0.0.0.0:8080
 #   LLAMA_SERVER_BIN  default $HOME/DEV/gits/llama.cpp/build/bin/llama-server
+#   LLAMA_CACHE       m2pro: /Volumes/Fast Data/LLM/llama.cpp
+#                     m4pro: llama.cpp's platform default
+#   MODEL_ENV         optional host-local env file (default config/llama-swap/<role>.env)
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -26,6 +29,39 @@ if [ ! -f "$CONFIG" ]; then
   exit 1
 fi
 
+ENV_FILE="${MODEL_ENV:-$REPO_ROOT/config/llama-swap/$ROLE.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
+
+if [ "$ROLE" = "m2pro" ]; then
+  : "${LLAMA_CACHE:=/Volumes/Fast Data/LLM/llama.cpp}"
+fi
+
+if [ -n "${LLAMA_CACHE:-}" ]; then
+  # Never create /Volumes/<missing drive> on the system disk. A directory
+  # existing alone is insufficient: require an actual mounted filesystem.
+  case "$LLAMA_CACHE" in
+    /Volumes/*/*)
+      volume="${LLAMA_CACHE#/Volumes/}"
+      volume="/Volumes/${volume%%/*}"
+      if ! /sbin/mount | grep -Fq " on $volume ("; then
+        echo "error: model volume is not mounted: $volume" >&2
+        exit 1
+      fi
+      ;;
+  esac
+  mkdir -p "$LLAMA_CACHE"
+  if [ ! -w "$LLAMA_CACHE" ]; then
+    echo "error: model cache is not writable: $LLAMA_CACHE" >&2
+    exit 1
+  fi
+  export LLAMA_CACHE
+fi
+
 if ! command -v llama-swap >/dev/null 2>&1; then
   echo "error: llama-swap not installed; run ./scripts/install-llama-swap.sh" >&2
   exit 1
@@ -42,6 +78,7 @@ fi
 echo "role:   $ROLE"
 echo "config: $CONFIG"
 echo "llama:  $LLAMA_SERVER_BIN"
+echo "cache:  ${LLAMA_CACHE:-llama.cpp platform default}"
 echo "listen: ${LISTEN:-0.0.0.0:8080}"
 echo
 

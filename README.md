@@ -157,6 +157,37 @@ cd ~/DEV/llm-hub
 ./scripts/start-models.sh m2pro      # binds 0.0.0.0:8080
 ```
 
+### Model storage (including launchd)
+
+The mini automatically exports `LLAMA_CACHE="/Volumes/Fast Data/LLM/llama.cpp"`.
+Downloads made with `-hf` go there; the directory is created as needed, but
+**only after checking that `/Volumes/Fast Data` is actually mounted**. If the
+drive is missing or the cache is not writable, startup fails instead of
+downloading models onto the internal disk. Existing downloads elsewhere are
+not moved automatically.
+
+No terminal export or plist edit is needed: foreground and launchd both call
+`scripts/start-models.sh`, which applies the same settings. If the drive is
+unavailable at login, launchd retries (at its configured 30-second throttle).
+Keep the drive connected while serving models. macOS may require permission
+for the service to access removable volumes; check its logs if access fails.
+
+For persistent host-specific overrides, copy the example and edit it:
+
+```bash
+cp config/llama-swap/model.env.example config/llama-swap/m2pro.env
+# Edit the quoted LLAMA_CACHE path or LLAMA_SERVER_BIN as needed.
+```
+
+`m2pro.env` and `m4pro.env` are gitignored shell files; only source trusted
+content. They override inherited environment settings. The laptop keeps
+llama.cpp's platform-default cache unless you set `LLAMA_CACHE` in `m4pro.env`
+or its environment. Restart the service after changing settings. With launchd:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.alepape.llmhub.llama-swap"
+```
+
 Verify independently:
 
 ```bash
