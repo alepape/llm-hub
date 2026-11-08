@@ -196,12 +196,14 @@ open http://imac-thunder:4000/ui             # LiteLLM UI (needs master_key)
 open http://mini-thunder:8080/ui             # llama-swap UI: logs, tokens, load/unload
 ```
 
-Logs, when run under launchd:
+Logs, when run under launchd (the path includes the full agent label):
 
 ```bash
-tail -f ~/Library/Logs/llm-hub-router.log
-tail -f ~/Library/Logs/llm-hub-llama-swap.log
+tail -f ~/Library/Logs/llm-hub-com.alepape.llmhub.router.log
+tail -f ~/Library/Logs/llm-hub-com.alepape.llmhub.llama-swap.log
 ```
+
+`llama-swap` also has a web UI at `http://host:8080/ui` with per-request logs.
 
 ---
 
