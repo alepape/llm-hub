@@ -54,8 +54,38 @@ render "$template" "$label" "$dest"
 
 plutil -lint "$dest" >/dev/null
 
-launchctl bootout "gui/$UID/$label" 2>/dev/null || true
-launchctl bootstrap "gui/$UID" "$dest"
+service_loaded() {
+  launchctl print "gui/$UID/$label" >/dev/null 2>&1
+}
+
+# bootout returns before launchd has actually removed the job, and bootstrapping
+# a job that is still loaded fails with the unhelpful "Bootstrap failed: 5:
+# Input/output error". Wait for it to disappear, then retry the bootstrap.
+if service_loaded; then
+  launchctl bootout "gui/$UID/$label" >/dev/null 2>&1 || true
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    service_loaded || break
+    sleep 0.5
+  done
+fi
+
+bootstrap_error=""
+for _ in 1 2 3 4 5; do
+  service_loaded && break
+  if bootstrap_error="$(launchctl bootstrap "gui/$UID" "$dest" 2>&1)"; then
+    break
+  fi
+  sleep 1
+done
+
+if ! service_loaded; then
+  echo "error: could not load $label" >&2
+  [ -n "$bootstrap_error" ] && printf '%s\n' "$bootstrap_error" >&2
+  echo "the plist was written to $dest; fix the error above and re-run" >&2
+  echo "to load it by hand: launchctl bootstrap gui/$UID \"$dest\"" >&2
+  exit 1
+fi
+
 launchctl enable "gui/$UID/$label" 2>/dev/null || true
 
 echo "installed and bootstrapped: $dest"

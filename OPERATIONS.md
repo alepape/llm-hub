@@ -46,6 +46,10 @@ Under launchd, restart in place:
 launchctl kickstart -k "gui/$(id -u)/com.alepape.llmhub.router"
 ```
 
+`kickstart -k` restarts an installed agent. `launchctl bootstrap` is only for
+loading a plist that is not loaded yet; on an already-loaded job it fails with
+the misleading `Bootstrap failed: 5: Input/output error`.
+
 Probe with `/health/liveliness`, not `/health`. `/health` runs upstream model
 health checks, returns 500 without a DB, and would cold-load models.
 
@@ -219,6 +223,8 @@ tail -f ~/Library/Logs/llm-hub-com.alepape.llmhub.llama-swap.log
 | Model reloads on every request | request never reaches the model (proxy error) or `ttl` is tiny | check `http://host:8080/logs` |
 | Port 8080 already in use | leftover `llama-server` from an old tmux session | `pgrep -fl llama-server`, kill it |
 | `launchctl kickstart` says "Could not find service" | the launchd agent is not installed on this node | run `./scripts/install-launchd.sh router` (or `models <role>`) once, then kickstart again |
+| `launchctl bootstrap` says "Input/output error" (5) | the job is already loaded; launchd reports this instead of "already loaded" | `launchctl list \| grep llmhub`; restart with `kickstart -k`, do not bootstrap again |
+| Node is down after re-running `install-launchd.sh` | the old job had not finished unloading, so the immediate bootstrap failed and the script stopped | update the repo, then re-run `install-launchd.sh`; the current version waits for the unload and retries the bootstrap |
 
 ---
 
