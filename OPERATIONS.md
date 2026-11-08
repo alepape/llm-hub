@@ -6,6 +6,17 @@ node only.
 
 For the architecture and design rationale, see [README.md](README.md).
 
+## Paths
+
+Examples use `$REPO` for the clone location:
+
+```bash
+export REPO=~/DEV/gits/llm-hub        # imac-thunder
+# export REPO=~/DEV/opencode/llm-hub  # mini-thunder
+```
+
+Set it to the clone path on whichever host you are on.
+
 ---
 
 ## What runs where
@@ -16,7 +27,7 @@ For the architecture and design rationale, see [README.md](README.md).
 | `mini-thunder` | llama-swap (m2pro) | 8080 | `./scripts/start-models.sh m2pro` | `com.alepape.llmhub.llama-swap` |
 | `m4pro` | llama-swap (m4pro) | 8080 | `./scripts/start-models.sh m4pro` | `com.alepape.llmhub.llama-swap` |
 
-Run each command on its own host, from `~/DEV/llm-hub`.
+Run each command on its own host, from `$REPO`.
 
 ## Starting and stopping
 
@@ -25,7 +36,7 @@ Run each command on its own host, from `~/DEV/llm-hub`.
 Foreground (Ctrl-C to stop):
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/start-router.sh
 ```
 
@@ -46,7 +57,7 @@ cooldown is sufficient.
 ### mini-thunder — always-on model host
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/start-models.sh m2pro      # binds 0.0.0.0:8080
 ```
 
@@ -64,7 +75,7 @@ Afterwards it stays loaded until `ttl` (10 min here) expires.
 ### m4pro — laptop model host
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/start-models.sh m4pro
 ```
 
@@ -108,7 +119,7 @@ Point anything OpenAI-compatible at the router:
 
 ```bash
 export OPENAI_BASE_URL=http://imac-thunder:4000/v1
-export OPENAI_API_KEY=$(grep '^LITELLM_MASTER_KEY=' ~/DEV/llm-hub/config/router/router.env | cut -d= -f2)
+export OPENAI_API_KEY=$(grep '^LITELLM_MASTER_KEY=' "$REPO/config/router/router.env" | cut -d= -f2)
 ```
 
 opencode (example, adjust to your version) — substitute the generated key for
@@ -205,6 +216,7 @@ tail -f ~/Library/Logs/llm-hub-llama-swap.log
 | `llama-swap` starts, model fails | `LLAMA_SERVER_BIN` wrong | `echo $LLAMA_SERVER_BIN; $LLAMA_SERVER_BIN --version` |
 | Model reloads on every request | request never reaches the model (proxy error) or `ttl` is tiny | check `http://host:8080/logs` |
 | Port 8080 already in use | leftover `llama-server` from an old tmux session | `pgrep -fl llama-server`, kill it |
+| `launchctl kickstart` says "Could not find service" | the launchd agent is not installed on this node | run `./scripts/install-launchd.sh router` (or `models <role>`) once, then kickstart again |
 
 ---
 
@@ -251,10 +263,10 @@ both streaming and non-streaming calls. Verified on LiteLLM 1.106.6.
 Only needed for a new or rebuilt node. If the node is already serving, skip this
 whole section.
 
-Clone the repo on each host:
+Clone the repo on each host (set `$REPO` first, see [Paths](#paths)):
 
 ```bash
-git clone https://github.com/alepape/llm-hub.git ~/DEV/llm-hub
+git clone https://github.com/alepape/llm-hub.git "$REPO"
 ```
 
 Anywhere is fine; scripts resolve their own path.
@@ -265,7 +277,7 @@ Requirements: macOS, Homebrew (`/usr/local/bin/brew` on this Intel iMac),
 Python ≥ 3.10 (3.13 is installed at `/usr/local/bin/python3`).
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/install-router.sh          # creates .venv, installs litellm[proxy], makes router.env
 $EDITOR config/router/router.env     # set M4PRO_BASE / M2PRO_BASE
 ./scripts/start-router.sh            # foreground; Ctrl-C to stop
@@ -292,7 +304,7 @@ Autostart:
 ## mini-thunder — model host install
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/install-llama-swap.sh      # brew tap mostlygeek/llama-swap; brew install
 ./scripts/start-models.sh m2pro      # binds 0.0.0.0:8080
 ```
@@ -327,7 +339,7 @@ default-allow on your LAN. If that bothers you, add `apiKeys:` to
 Same as the mini, different role:
 
 ```bash
-cd ~/DEV/llm-hub
+cd "$REPO"
 ./scripts/install-llama-swap.sh
 ./scripts/start-models.sh m4pro
 ```
